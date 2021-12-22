@@ -47,6 +47,7 @@ class Game:
         self.zeros = count_zeros(self.unsolved)
         self.duplicate_pos = [0, 0]
         self.git = Git(self)
+        self.load()
 
     def __check_segment(self, ix, iy, value: int):
         sx = ix // 3
@@ -172,15 +173,16 @@ class Game:
         self.git.commit(args[0])
 
     def save(self):
-        with open(self.file_name, 'w') as f:
+        self.git.save()
+        with open(self.git.last_state_file, 'w') as f:
             for row in self.unsolved:
                 f.write(f'{",".join(list(map(lambda x: str(x), row)))}\n')
             f.write(f'{self.zeros},{self.wrong}\n')
 
-    def load(self, file_name):
-        self.file_name = file_name
+    def load(self):
+        self.git.load()
         try:
-            with open(file_name, 'r') as f:
+            with open(self.git.last_state_file, 'r') as f:
                 self.unsolved = []
                 for i in range(0, 9):
                     self.unsolved.append(list(map(lambda x: int(x), f.readline().split(','))))
@@ -246,8 +248,44 @@ class Commit:
         self.d_zero += zero
 
     def __str__(self):
-        return f'Parent: {self.p_id:5} DWrong: {self.d_wrong: 5} DZeros: {self.d_zero:5} ' \
-               f'Inserted: {self.inserted} Removed: {self.deleted}'
+        return f'Parent: {self.p_id:5} DWrong: {self.d_wrong: 5} DZeros: {self.d_zero:5} Name: {self.name}\n' \
+               f'\tInserted: {self.inserted}\n' \
+               f'\tRemoved: {self.deleted}\n' \
+               f'\tChildren: {self.c_ids}'
+
+    def write(self, file):
+        file.write(f'{self.p_id},{self.d_wrong},{self.d_zero},{self.name}\n')
+        file.write(f'{",".join(list(map(lambda x: ",".join(list(map(lambda y: str(y), x))), self.inserted)))}\n')
+        file.write(f'{",".join(list(map(lambda x: ",".join(list(map(lambda y: str(y), x))), self.deleted)))}\n')
+        file.write(f'{",".join(list(map(lambda x: str(x), self.c_ids)))}\n')
+
+    def read(self, file):
+        other = file.readline().split(',')
+
+        tmp_inserted = file.readline()
+        print(f"t [{tmp_inserted}]")
+        if tmp_inserted != "\n":
+            tmp_inserted = tmp_inserted.replace("\n", "")
+            inserted = list(map(lambda x: int(x), tmp_inserted.split(',')))
+            for i in range(0, len(inserted), 3):
+                self.inserted.append([inserted[i], inserted[i + 1], inserted[i + 2]])
+
+        tmp_deleted = file.readline()
+        if tmp_deleted != "\n":
+            tmp_deleted = tmp_deleted.replace("\n", "")
+            deleted = list(map(lambda x: int(x), tmp_deleted.split(',')))
+            for i in range(0, len(deleted), 3):
+                self.deleted.append([deleted[i], deleted[i + 1], deleted[i + 2]])
+
+        tmp_ids = file.readline()
+        if tmp_ids != "\n":
+            tmp_ids = tmp_ids.replace("\n", "")
+            self.c_ids = list(map(lambda x: int(x), tmp_ids.split(',')))
+
+        self.p_id = int(other[0])
+        self.d_wrong = int(other[1])
+        self.d_zero = int(other[2])
+        self.name = other[3].replace("\n", "")
 
 
 class Git:
@@ -258,7 +296,6 @@ class Git:
         self.game = game
         self.last_state_file = 'state.dt'
         self.git = 'git.dt'
-        self.game.load(self.last_state_file)
 
     def revert_index(self):
         # undo index changes
@@ -331,6 +368,29 @@ class Git:
         self.head = len(self.commits) - 1
         self.index = Commit(-1, 'index')
         print(f'Commited:\n====\n{self.commits[self.head]}\n====')
+
+    def save(self):
+        with open(self.git, 'w') as f:
+            f.write(f'{self.head}\n')
+            self.index.write(f)
+            f.write(f'{len(self.commits)}\n')
+            for c in self.commits:
+                c.write(f)
+
+    def load(self):
+        try:
+            with open(self.git, 'r') as f:
+                self.commits.clear()
+                self.head = int(f.readline().replace("\n", ""))
+                self.index.read(f)
+                count = int(f.readline().replace("\n", ""))
+                for i in range(0, count):
+                    c = Commit(-1, 'readable')
+                    c.read(f)
+                    self.commits.append(c)
+
+        except FileNotFoundError:
+            pass
 
 
 class Window:
