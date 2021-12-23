@@ -170,7 +170,10 @@ class Game:
         self.git.undo(args)
 
     def cmd_commit(self, args):
-        self.git.commit(args[0])
+        if len(args) == 0:
+            print('Empty args')
+            return
+        self.git.commit(' '.join(args))
 
     def save(self):
         self.git.save()
@@ -263,7 +266,6 @@ class Commit:
         other = file.readline().split(',')
 
         tmp_inserted = file.readline()
-        print(f"t [{tmp_inserted}]")
         if tmp_inserted != "\n":
             tmp_inserted = tmp_inserted.replace("\n", "")
             inserted = list(map(lambda x: int(x), tmp_inserted.split(',')))
@@ -300,9 +302,9 @@ class Git:
     def revert_index(self):
         # undo index changes
         for ins in self.index.inserted:
-            self.game.unsolved[ins[0]][ins[1]] = 0
+            self.game.unsolved[ins[1]][ins[0]] = 0
         for rem in self.index.deleted:
-            self.game.unsolved[rem[0]][rem[1]] = rem[2]
+            self.game.unsolved[rem[1]][rem[0]] = rem[2]
         self.game.wrong -= self.index.d_wrong
         self.game.zeros -= self.index.d_zero
         self.index = Commit(-1, 'index')
@@ -317,9 +319,9 @@ class Git:
         self.revert_index()
 
         for ins in cur_commit.inserted:
-            self.game.unsolved[ins[0]][ins[1]] = 0
+            self.game.unsolved[ins[1]][ins[0]] = 0
         for rem in cur_commit.deleted:
-            self.game.unsolved[rem[0]][rem[1]] = rem[2]
+            self.game.unsolved[rem[1]][rem[0]] = rem[2]
         self.game.wrong -= cur_commit.d_wrong
         self.game.zeros -= cur_commit.d_zero
 
@@ -350,9 +352,9 @@ class Git:
 
             # apply commit changes
             for ins in next_commit.inserted:
-                self.game.unsolved[ins[0]][ins[1]] = ins[2]
+                self.game.unsolved[ins[1]][ins[0]] = ins[2]
             for rem in next_commit.deleted:
-                self.game.unsolved[rem[0]][rem[1]] = 0
+                self.game.unsolved[rem[1]][rem[0]] = 0
             self.game.wrong += next_commit.d_wrong
             self.game.zeros += next_commit.d_zero
 
